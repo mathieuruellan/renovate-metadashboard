@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-forgejo-api = "0.10"
+forgejo-api = { version = "0.10", default-features = false, features = ["rustls-tls"] }
 dotenv = "0.15"
 tokio = { version = "1", features = ["full"] }
 pulldown-cmark = "0.13"
