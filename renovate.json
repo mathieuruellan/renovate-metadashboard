@@ -1,0 +1,13 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 10,
+  "packageRules": [
+    {
+      "matchCategories": ["docker"],
+      "groupName": "Docker images",
+      "pinDigests": false
+    }
+  ]
+}

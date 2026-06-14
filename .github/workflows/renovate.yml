@@ -1,0 +1,20 @@
+name: Renovate
+on:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: renovatebot/github-action@v46.1.14
+        with:
+          configurationFile: renovate.json
+          token: ${{ secrets.RENOVATE_TOKEN }}
+        env:
+          RENOVATE_AUTODISCOVER: 'true'
+          RENOVATE_AUTODISCOVER_FILTER: 'mathieuruellan/renovate-metadashboard'
