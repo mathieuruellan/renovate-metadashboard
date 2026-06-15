@@ -916,6 +916,8 @@ dependencies = [
  "eyre",
  "forgejo-api",
  "pulldown-cmark",
+ "reqwest",
+ "serde",
  "tokio",
  "url",
 ]

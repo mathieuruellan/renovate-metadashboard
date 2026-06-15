@@ -7,14 +7,23 @@ use crate::parser::Dashboard;
 
 pub struct ForgejoClient {
     api: Forgejo,
+    base_url: String,
 }
 
 impl ForgejoClient {
     pub fn new(config: &Config) -> Result<Self> {
         let url = url::Url::parse(&config.forgejo_url)
             .wrap_err_with(|| format!("Invalid FORGEJO_URL: {}", config.forgejo_url))?;
-        let api = Forgejo::new(Auth::Token(&config.forgejo_token), url)?;
-        Ok(ForgejoClient { api })
+        let api = Forgejo::new(Auth::Token(&config.forgejo_token), url.clone())?;
+        Ok(ForgejoClient { api, base_url: config.forgejo_url.clone() })
+    }
+
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    pub fn pr_search_url(&self, full_name: &str, branch: &str) -> String {
+        format!("{}/{}/pulls?q={}", self.base_url, full_name, branch)
     }
 
     pub async fn fetch_dashboards(&self) -> Result<Vec<(String, String, String, Dashboard)>> {

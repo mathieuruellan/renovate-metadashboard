@@ -2,10 +2,12 @@ use std::fs;
 use eyre::{Result, WrapErr};
 use chrono::Local;
 
+use crate::client::PlatformClient;
 use crate::parser::Dashboard;
 
 fn count_updates(dashboard: &Dashboard) -> usize {
     dashboard.pending_approval.len()
+        + dashboard.open.len()
         + dashboard.awaiting_schedule.len()
         + dashboard.rate_limited.len()
         + dashboard.errored.len()
@@ -15,13 +17,14 @@ fn count_updates(dashboard: &Dashboard) -> usize {
 
 pub fn generate_report(
     dashboards: &[(String, String, String, Dashboard)],
-    forgejo_url: &str,
+    client: &PlatformClient,
     output_path: &str,
 ) -> Result<()> {
     let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     let total_pending: usize = dashboards.iter().map(|(_, _, _, d)| count_updates(d)).sum();
     let total_pending_approval: usize = dashboards.iter().map(|(_, _, _, d)| d.pending_approval.len()).sum();
+    let total_open: usize = dashboards.iter().map(|(_, _, _, d)| d.open.len()).sum();
     let total_awaiting: usize = dashboards.iter().map(|(_, _, _, d)| d.awaiting_schedule.len()).sum();
     let total_rate_limited: usize = dashboards.iter().map(|(_, _, _, d)| d.rate_limited.len()).sum();
     let total_errored: usize = dashboards.iter().map(|(_, _, _, d)| d.errored.len()).sum();
@@ -49,6 +52,7 @@ pub fn generate_report(
         .card p {{ color: #666; font-size: 0.9rem; }}
         .card.total h3 {{ color: #1a1a1a; }}
         .card.pending h3 {{ color: #f59e0b; }}
+        .card.open h3 {{ color: #10b981; }}
         .card.awaiting h3 {{ color: #3b82f6; }}
         .card.ratelimited h3 {{ color: #8b5cf6; }}
         .card.error h3 {{ color: #ef4444; }}
@@ -69,11 +73,18 @@ pub fn generate_report(
         td a:hover {{ text-decoration: underline; }}
         .badge {{ display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500; }}
         .badge.pending {{ background: #fef3c7; color: #92400e; }}
+        .badge.open {{ background: #d1fae5; color: #065f46; }}
         .badge.awaiting {{ background: #dbeafe; color: #1e40af; }}
         .badge.ratelimited {{ background: #ede9fe; color: #5b21b6; }}
         .badge.error {{ background: #fee2e2; color: #991b1b; }}
         .badge.automerge {{ background: #d1fae5; color: #065f46; }}
         .badge.other {{ background: #f3f4f6; color: #374151; }}
+        .build-status {{ display: inline-block; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 0.5rem; }}
+        .build-successful {{ background: #d1fae5; color: #065f46; }}
+        .build-failed {{ background: #fee2e2; color: #991b1b; }}
+        .build-in-progress {{ background: #dbeafe; color: #1e40af; }}
+        .build-pending {{ background: #fef3c7; color: #92400e; }}
+        .build-unknown {{ background: #f3f4f6; color: #6b7280; }}
         .no-dashboards {{ text-align: center; padding: 3rem; color: #6b7280; }}
     </style>
 </head>
@@ -90,6 +101,10 @@ pub fn generate_report(
             <div class="card pending">
                 <h3>{total_pending_approval}</h3>
                 <p>Pending Approval</p>
+            </div>
+            <div class="card open">
+                <h3>{total_open}</h3>
+                <p>Open PRs</p>
             </div>
             <div class="card awaiting">
                 <h3>{total_awaiting}</h3>
@@ -124,12 +139,13 @@ pub fn generate_report(
                 dashboard_url, full_name
             ));
 
-            render_section(&mut html, "Pending Approval", &dashboard.pending_approval, "pending", full_name, forgejo_url);
-            render_section(&mut html, "Awaiting Schedule", &dashboard.awaiting_schedule, "awaiting", full_name, forgejo_url);
-            render_section(&mut html, "Rate-Limited", &dashboard.rate_limited, "ratelimited", full_name, forgejo_url);
-            render_section(&mut html, "Errored", &dashboard.errored, "error", full_name, forgejo_url);
-            render_section(&mut html, "Pending Branch Automerge", &dashboard.pending_automerge, "automerge", full_name, forgejo_url);
-            render_section(&mut html, "Other Branches", &dashboard.other, "other", full_name, forgejo_url);
+            render_section(&mut html, "Pending Approval", &dashboard.pending_approval, "pending", full_name, client);
+            render_section(&mut html, "Open PRs", &dashboard.open, "open", full_name, client);
+            render_section(&mut html, "Awaiting Schedule", &dashboard.awaiting_schedule, "awaiting", full_name, client);
+            render_section(&mut html, "Rate-Limited", &dashboard.rate_limited, "ratelimited", full_name, client);
+            render_section(&mut html, "Errored", &dashboard.errored, "error", full_name, client);
+            render_section(&mut html, "Pending Branch Automerge", &dashboard.pending_automerge, "automerge", full_name, client);
+            render_section(&mut html, "Other Branches", &dashboard.other, "other", full_name, client);
 
             html.push_str("</div>\n");
         }
@@ -151,7 +167,7 @@ fn render_section(
     updates: &[crate::parser::Update],
     badge_class: &str,
     full_name: &str,
-    forgejo_url: &str,
+    client: &PlatformClient,
 ) {
     if updates.is_empty() {
         html.push_str(&format!(
@@ -165,7 +181,7 @@ fn render_section(
         r#"<div class="section">
     <h3><span class="badge {}">{}</span> ({})</h3>
     <table>
-        <thead><tr><th>Description</th><th>Branch</th></tr></thead>
+        <thead><tr><th>Description</th><th>Branch</th><th>Build</th></tr></thead>
         <tbody>"#,
         badge_class,
         title,
@@ -176,16 +192,21 @@ fn render_section(
         let branch_display = if update.branch.is_empty() {
             "-".to_string()
         } else {
-            let pr_url = format!(
-                "{}/{}/pulls?q={}",
-                forgejo_url, full_name, update.branch
-            );
+            let pr_url = client.pr_search_url(full_name, &update.branch);
             format!("<a href=\"{}\"><code>{}</code></a>", pr_url, update.branch)
         };
 
+        let build_display = match update.build_status.as_deref() {
+            Some("successful") => r#"<span class="build-status build-successful">&#10003; OK</span>"#.to_string(),
+            Some("failed") => r#"<span class="build-status build-failed">&#10007; Failed</span>"#.to_string(),
+            Some("in_progress") => r#"<span class="build-status build-in-progress">Building...</span>"#.to_string(),
+            Some("no_build") => r#"<span class="build-status build-unknown">No CI</span>"#.to_string(),
+            _ => String::new(),
+        };
+
         html.push_str(&format!(
-            "<tr><td>{}</td><td>{}</td></tr>",
-            update.description, branch_display
+            "<tr><td>{}</td><td>{}</td><td>{}</td></tr>",
+            update.description, branch_display, build_display
         ));
     }
 
