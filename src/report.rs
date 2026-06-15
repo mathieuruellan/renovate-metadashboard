@@ -79,6 +79,12 @@ pub fn generate_report(
         .badge.error {{ background: #fee2e2; color: #991b1b; }}
         .badge.automerge {{ background: #d1fae5; color: #065f46; }}
         .badge.other {{ background: #f3f4f6; color: #374151; }}
+        .build-status {{ display: inline-block; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-left: 0.5rem; }}
+        .build-successful {{ background: #d1fae5; color: #065f46; }}
+        .build-failed {{ background: #fee2e2; color: #991b1b; }}
+        .build-in-progress {{ background: #dbeafe; color: #1e40af; }}
+        .build-pending {{ background: #fef3c7; color: #92400e; }}
+        .build-unknown {{ background: #f3f4f6; color: #6b7280; }}
         .no-dashboards {{ text-align: center; padding: 3rem; color: #6b7280; }}
     </style>
 </head>
@@ -175,7 +181,7 @@ fn render_section(
         r#"<div class="section">
     <h3><span class="badge {}">{}</span> ({})</h3>
     <table>
-        <thead><tr><th>Description</th><th>Branch</th></tr></thead>
+        <thead><tr><th>Description</th><th>Branch</th><th>Build</th></tr></thead>
         <tbody>"#,
         badge_class,
         title,
@@ -190,9 +196,17 @@ fn render_section(
             format!("<a href=\"{}\"><code>{}</code></a>", pr_url, update.branch)
         };
 
+        let build_display = match update.build_status.as_deref() {
+            Some("successful") => r#"<span class="build-status build-successful">&#10003; OK</span>"#.to_string(),
+            Some("failed") => r#"<span class="build-status build-failed">&#10007; Failed</span>"#.to_string(),
+            Some("in_progress") => r#"<span class="build-status build-in-progress">Building...</span>"#.to_string(),
+            Some("no_build") => r#"<span class="build-status build-unknown">No CI</span>"#.to_string(),
+            _ => String::new(),
+        };
+
         html.push_str(&format!(
-            "<tr><td>{}</td><td>{}</td></tr>",
-            update.description, branch_display
+            "<tr><td>{}</td><td>{}</td><td>{}</td></tr>",
+            update.description, branch_display, build_display
         ));
     }
 

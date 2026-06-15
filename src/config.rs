@@ -27,6 +27,7 @@ pub struct Config {
     pub gitlab_token: String,
     pub bitbucket_url: String,
     pub bitbucket_token: String,
+    pub bitbucket_project: Option<String>,
     pub report_output: String,
 }
 
@@ -43,6 +44,7 @@ impl Config {
         let gitlab_token = env::var("GITLAB_TOKEN").unwrap_or_default();
         let bitbucket_url = env::var("BITBUCKET_URL").unwrap_or_default();
         let bitbucket_token = env::var("BITBUCKET_TOKEN").unwrap_or_default();
+        let bitbucket_project = env::var("BITBUCKET_PROJECT").ok().filter(|s| !s.is_empty());
 
         let report_output = env::var("REPORT_OUTPUT_FILE")
             .unwrap_or_else(|_| "report.html".to_string());
@@ -82,6 +84,7 @@ impl Config {
             gitlab_token,
             bitbucket_url,
             bitbucket_token,
+            bitbucket_project,
             report_output,
         })
     }

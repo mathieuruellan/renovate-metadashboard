@@ -37,7 +37,7 @@ impl GitlabClient {
             .build()
             .wrap_err("Failed to build HTTP client")?;
         Ok(GitlabClient {
-            base_url: config.gitlab_url.clone(),
+            base_url: config.gitlab_url.trim_end_matches('/').to_string(),
             token: config.gitlab_token.clone(),
             client,
         })

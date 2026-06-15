@@ -18,6 +18,7 @@ pub struct Update {
     pub description: String,
     #[allow(dead_code)]
     pub checked: bool,
+    pub build_status: Option<String>,
 }
 
 pub fn parse_dashboard(body: &str) -> Result<Dashboard> {
@@ -110,6 +111,7 @@ pub fn parse_dashboard(body: &str) -> Result<Dashboard> {
                         branch,
                         description,
                         checked,
+                        build_status: None,
                     };
 
                     match current_section.as_str() {
