@@ -4,6 +4,7 @@ use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 #[derive(Debug, Clone)]
 pub struct Dashboard {
     pub pending_approval: Vec<Update>,
+    pub open: Vec<Update>,
     pub awaiting_schedule: Vec<Update>,
     pub rate_limited: Vec<Update>,
     pub errored: Vec<Update>,
@@ -15,12 +16,14 @@ pub struct Dashboard {
 pub struct Update {
     pub branch: String,
     pub description: String,
+    #[allow(dead_code)]
     pub checked: bool,
 }
 
 pub fn parse_dashboard(body: &str) -> Result<Dashboard> {
     let mut dashboard = Dashboard {
         pending_approval: Vec::new(),
+        open: Vec::new(),
         awaiting_schedule: Vec::new(),
         rate_limited: Vec::new(),
         errored: Vec::new(),
@@ -110,7 +113,8 @@ pub fn parse_dashboard(body: &str) -> Result<Dashboard> {
                     };
 
                     match current_section.as_str() {
-                        "Pending Approval" | "Open" => dashboard.pending_approval.push(update),
+                        "Pending Approval" => dashboard.pending_approval.push(update),
+                        "Open" => dashboard.open.push(update),
                         "Awaiting Schedule" => dashboard.awaiting_schedule.push(update),
                         "Rate-Limited" => dashboard.rate_limited.push(update),
                         "Errored" => dashboard.errored.push(update),
