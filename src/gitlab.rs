@@ -1,6 +1,9 @@
 use eyre::{Result, WrapErr};
 use serde::Deserialize;
 
+use gitlab::api::{self, AsyncQuery, Pagination};
+use gitlab::Gitlab;
+
 use crate::config::Config;
 use crate::parser::Dashboard;
 
@@ -21,25 +24,23 @@ struct GitlabIssue {
     description: String,
     #[serde(default)]
     web_url: String,
-    #[allow(dead_code)]
-    iid: u64,
 }
 
 pub struct GitlabClient {
+    client: gitlab::AsyncGitlab,
     base_url: String,
-    token: String,
-    client: reqwest::Client,
 }
 
 impl GitlabClient {
-    pub fn new(config: &Config) -> Result<Self> {
-        let client = reqwest::Client::builder()
-            .build()
-            .wrap_err("Failed to build HTTP client")?;
+    pub async fn new(config: &Config) -> Result<Self> {
+        let url = config.gitlab_url.trim_end_matches('/');
+        let client = Gitlab::builder(url, &config.gitlab_token)
+            .build_async()
+            .await
+            .wrap_err("Failed to create GitLab client")?;
         Ok(GitlabClient {
-            base_url: config.gitlab_url.trim_end_matches('/').to_string(),
-            token: config.gitlab_token.clone(),
             client,
+            base_url: url.to_string(),
         })
     }
 
@@ -53,68 +54,46 @@ impl GitlabClient {
 
     pub async fn fetch_dashboards(&self) -> Result<Vec<(String, String, String, Dashboard)>> {
         let mut dashboards = Vec::new();
-        let mut page = 1;
 
-        loop {
-            let projects = self.list_projects(page).await?;
+        let endpoint = gitlab::api::projects::Projects::builder()
+            .build()
+            .wrap_err("Failed to build projects query")?;
 
-            if projects.is_empty() {
-                break;
-            }
+        let projects: Vec<GitlabProject> = api::paged(endpoint, Pagination::All)
+            .query_async(&self.client)
+            .await
+            .wrap_err("Failed to list GitLab projects")?;
 
-            for project in &projects {
-                let full_name = &project.path_with_namespace;
-                let repo_name = &project.name;
+        for project in &projects {
+            let full_name = &project.path_with_namespace;
+            let repo_name = &project.name;
 
-                match self.find_dashboard(project.id, full_name).await {
-                    Ok(Some((dashboard, dashboard_url))) => {
-                        dashboards.push((full_name.clone(), repo_name.clone(), dashboard_url, dashboard));
-                    }
-                    Ok(None) => {}
-                    Err(e) => {
-                        eprintln!("Warning: Failed to fetch dashboard for {}: {}", full_name, e);
-                    }
+            match self.find_dashboard(project.id, full_name).await {
+                Ok(Some((dashboard, dashboard_url))) => {
+                    dashboards.push((full_name.clone(), repo_name.clone(), dashboard_url, dashboard));
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    eprintln!("Warning: Failed to fetch dashboard for {}: {}", full_name, e);
                 }
             }
-
-            page += 1;
         }
 
         Ok(dashboards)
     }
 
-    async fn list_projects(&self, page: u32) -> Result<Vec<GitlabProject>> {
-        let url = format!("{}/api/v4/projects?per_page=50&page={}", self.base_url, page);
-        let projects = self.client
-            .get(&url)
-            .header("PRIVATE-TOKEN", &self.token)
-            .send()
-            .await
-            .wrap_err_with(|| format!("Failed to list GitLab projects (page {})", page))?
-            .error_for_status()
-            .wrap_err_with(|| format!("GitLab API error listing projects (page {})", page))?
-            .json::<Vec<GitlabProject>>()
-            .await
-            .wrap_err_with(|| format!("Failed to parse GitLab projects response (page {})", page))?;
-        Ok(projects)
-    }
-
     async fn find_dashboard(&self, project_id: u64, full_name: &str) -> Result<Option<(Dashboard, String)>> {
-        let url = format!(
-            "{}/api/v4/projects/{}/issues?state=opened&search=Dependency+Dashboard&per_page=100",
-            self.base_url, project_id
-        );
-        let issues = self.client
-            .get(&url)
-            .header("PRIVATE-TOKEN", &self.token)
-            .send()
+        let endpoint = gitlab::api::projects::issues::Issues::builder()
+            .project(project_id)
+            .state(gitlab::api::projects::issues::IssueState::Opened)
+            .search("Dependency Dashboard")
+            .build()
+            .wrap_err_with(|| format!("Failed to build issues query for {}", full_name))?;
+
+        let issues: Vec<GitlabIssue> = api::paged(endpoint, Pagination::All)
+            .query_async(&self.client)
             .await
-            .wrap_err_with(|| format!("Failed to list issues for {}", full_name))?
-            .error_for_status()
-            .wrap_err_with(|| format!("GitLab API error listing issues for {}", full_name))?
-            .json::<Vec<GitlabIssue>>()
-            .await
-            .wrap_err_with(|| format!("Failed to parse issues response for {}", full_name))?;
+            .wrap_err_with(|| format!("Failed to list issues for {}", full_name))?;
 
         for issue in &issues {
             if issue.title == "Dependency Dashboard" {
