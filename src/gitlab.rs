@@ -33,14 +33,17 @@ pub struct GitlabClient {
 
 impl GitlabClient {
     pub async fn new(config: &Config) -> Result<Self> {
-        let url = config.gitlab_url.trim_end_matches('/');
-        let client = Gitlab::builder(url, &config.gitlab_token)
+        let parsed = url::Url::parse(&config.gitlab_url)
+            .wrap_err("Invalid GITLAB_URL")?;
+        let host = parsed.host_str()
+            .ok_or_else(|| eyre::eyre!("GITLAB_URL missing host"))?;
+        let client = Gitlab::builder(host, &config.gitlab_token)
             .build_async()
             .await
             .wrap_err("Failed to create GitLab client")?;
         Ok(GitlabClient {
             client,
-            base_url: url.to_string(),
+            base_url: config.gitlab_url.trim_end_matches('/').to_string(),
         })
     }
 
