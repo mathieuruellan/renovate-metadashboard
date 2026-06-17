@@ -11,13 +11,13 @@ use eyre::Result;
 use crate::client::PlatformClient;
 use crate::config::{Config, Platform};
 
-fn build_client(config: &Config) -> Result<PlatformClient> {
+async fn build_client(config: &Config) -> Result<PlatformClient> {
     match config.platform {
         Platform::Forgejo => {
             Ok(PlatformClient::Forgejo(forgejo::ForgejoClient::new(config)?))
         }
         Platform::Gitlab => {
-            Ok(PlatformClient::Gitlab(gitlab::GitlabClient::new(config)?))
+            Ok(PlatformClient::Gitlab(gitlab::GitlabClient::new(config).await?))
         }
         Platform::Bitbucket => {
             Ok(PlatformClient::Bitbucket(bitbucket::BitbucketClient::new(config)?))
@@ -28,7 +28,7 @@ fn build_client(config: &Config) -> Result<PlatformClient> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = Config::from_env()?;
-    let client = build_client(&config)?;
+    let client = build_client(&config).await?;
 
     println!("Connecting to {}...", client.base_url());
 

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 forgejo-api = { version = "0.10", default-features = false, features = ["rustls-tls"] }
+gitlab = "0.1900.0"
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json"] }
 serde = { version = "1", features = ["derive"] }
 dotenv = "0.15"
