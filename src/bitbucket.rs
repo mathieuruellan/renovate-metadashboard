@@ -31,6 +31,8 @@ struct BitbucketReposPage {
 struct BitbucketRepo {
     slug: String,
     name: String,
+    #[serde(default)]
+    archived: bool,
     #[allow(dead_code)]
     project: Option<BitbucketProjectRef>,
 }
@@ -125,6 +127,9 @@ impl BitbucketClient {
                 }
 
                 for repo in &repos.values {
+                    if repo.archived {
+                        continue;
+                    }
                     let full_name = format!("{}/{}", project_key, repo.slug);
 
                     match self.find_renovate_prs(project_key, &repo.slug, &full_name).await {
@@ -161,6 +166,9 @@ impl BitbucketClient {
                         }
 
                         for repo in &repos.values {
+                            if repo.archived {
+                                continue;
+                            }
                             let full_name = format!("{}/{}", project.key, repo.slug);
 
                             match self.find_renovate_prs(&project.key, &repo.slug, &full_name).await {
