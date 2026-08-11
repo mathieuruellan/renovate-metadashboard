@@ -53,6 +53,9 @@ impl ForgejoClient {
             }
 
             for repo in &repos {
+                if repo.archived == Some(true) {
+                    continue;
+                }
                 let owner = repo.owner.as_ref().map(|o| o.login.as_deref()).flatten().unwrap_or("unknown");
                 let repo_name = repo.name.as_deref().unwrap_or("unknown");
 

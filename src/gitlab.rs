@@ -14,6 +14,8 @@ struct GitlabProject {
     path_with_namespace: String,
     #[serde(default)]
     name: String,
+    #[serde(default)]
+    archived: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -68,6 +70,9 @@ impl GitlabClient {
             .wrap_err("Failed to list GitLab projects")?;
 
         for project in &projects {
+            if project.archived {
+                continue;
+            }
             let full_name = &project.path_with_namespace;
             let repo_name = &project.name;
 
