@@ -342,7 +342,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -536,9 +536,9 @@ checksum = "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7"
 
 [[package]]
 name = "gitlab"
-version = "0.1904.0"
+version = "0.1905.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2be3160d53b7245916287a3b94633ebd3fa8d748f9514424a8f0a66b6ff525e8"
+checksum = "9822ab17ec34380809fc318a4c7e9931487b00a415eb195c3fb2a8c48d862756"
 dependencies = [
  "async-trait",
  "backtrace",
@@ -1462,7 +1462,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2144,7 +2144,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
