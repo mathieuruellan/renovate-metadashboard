@@ -106,6 +106,9 @@ pub fn parse_dashboard(body: &str) -> Result<Dashboard> {
                 }
 
                 let description = description_parts.join("");
+                if description == "chore(deps): lock file maintenance" {
+                    continue;
+                }
                 if !description.is_empty() || !branch.is_empty() {
                     let update = Update {
                         branch,
